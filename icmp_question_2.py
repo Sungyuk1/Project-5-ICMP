@@ -42,11 +42,16 @@ def receiveOnePing(mySocket, ID, timeout, destAddr):
         timeReceived = time.time()
         recPacket, addr = mySocket.recvfrom(1024)
 
-            # Fill in start
-            # one or multiple lines of your code
-            # You can use "struct.unpack" function with
-            # parameter "bbHHh" to decode the ICMP header
-            # Fill in end
+        # Fill in start
+        # one or multiple lines of your code
+        # You can use "struct.unpack" function with
+        # parameter "bbHHh" to decode the ICMP header
+        # Fill in end
+        icmp_header = recPacket[20:28]
+        type, code, checksum, packetID, sequence = struct.unpack("bbHHh", icmp_header)
+
+        #debug code
+        #print("debug : " + str(type))
 
          
          
@@ -56,6 +61,8 @@ def receiveOnePing(mySocket, ID, timeout, destAddr):
             return timeReceived - timeSent
             
         timeLeft = timeLeft - howLongInSelect
+        #debug code
+        #print("debug" + str(timeLeft))
         if timeLeft <= 0:
             return "Request timed out."
 
@@ -68,10 +75,11 @@ def sendOnePing(mySocket, destAddr, ID):
     data = struct.pack("d", time.time())
 
 
-        # Fill in start
-        # one or multiple lines of your code
-        # Calculate the checksum on the data and the dummy header.
-        # Fill in end
+    # Fill in start
+    # one or multiple lines of your code
+    # Calculate the checksum on the data and the dummy header.
+    # Fill in end
+    myChecksum = checksum(header+data) 
 
 
     # Get the right checksum, and put in the header
@@ -84,16 +92,19 @@ def sendOnePing(mySocket, destAddr, ID):
     header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0, myChecksum, ID, 1)
 
 
-        # Fill in start
-        # one or multiple lines of your code
-        # use the socket to send the ICMP packet
-        # Fill in end
+    # Fill in start
+    # one or multiple lines of your code
+    # use the socket to send the ICMP packet
+    # Fill in end
+    mySocket.sendto(header+data, (destAddr, 1))
+
 
 
 def doOnePing(destAddr, timeout): 
     icmp = getprotobyname("icmp")
     # SOCK_RAW is a powerful socket type. For more details:   http://sock-raw.org/papers/sock_raw
-    mySocket = socket(AF_INET, SOCK_RAW, icmp)
+    #mySocket = socket(AF_INET, SOCK_RAW, icmp)
+    mySocket = socket(AF_INET, SOCK_DGRAM, icmp) #Encountered "Operation not permitted" when using SOCK_RAW
     
     myID = os.getpid() & 0xFFFF  # Return the current process i
     sendOnePing(mySocket, destAddr, myID)
@@ -108,11 +119,37 @@ def ping(host, timeout=1):
     print("Pinging " + dest + " using Python:")
     print("")
     # Send ping requests to a server separated by approximately one second
-    while 1:
+    minimum_rtt = 99999999
+    maximum_rtt = 0
+    total_rtt = 0
+    packets_lost = 0
+
+    for i in range(0, 20):
         delay = doOnePing(dest, timeout)
-        print(delay)
+
+        #check for error to see if delay is a string for "Request Time Out"
+        if isinstance(delay, str):
+            packets_lost+=1
+        else:
+            minimum_rtt = min(minimum_rtt, delay)
+            maximum_rtt = max(maximum_rtt, delay)
+            total_rtt+=delay
         time.sleep(1)# one second
+    
+    print("Maximum RTT : " + str(maximum_rtt))
+    print("Minimum RTT : "+str(minimum_rtt))
+    print("Packet Loss Rate : " +str(packets_lost/20))
+    print("Average RTT : " + str(total_rtt/(20-packets_lost)))
     return delay
 
-ping("google.com")
+ping("127.0.0.1")
+print("------------------------")
+ping("ox.ac.uk")
+print("------------------------")
+ping("www.tsinghua.edu.cn")
+print("------------------------")
+ping("8.8.8.8")
+print("------------------------")
+ping("www.up.ac.za")
+#ping("google.com")
 
